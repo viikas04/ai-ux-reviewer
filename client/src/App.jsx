@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { Routes, Route, Link } from "react-router-dom";
 
 /* =========================
+   PRODUCTION BACKEND URL
+========================= */
+const BASE_URL = "https://ai-ux-reviewer-backend.onrender.com";
+
+/* =========================
    HOME PAGE
 ========================= */
 
@@ -14,7 +19,7 @@ function Home() {
 
   const fetchReviews = async () => {
     try {
-      const response = await fetch("http://localhost:5000/reviews");
+      const response = await fetch(`${BASE_URL}/reviews`);
       const data = await response.json();
       setReviews(data);
     } catch {
@@ -37,7 +42,7 @@ function Home() {
       setError("");
       setResult(null);
 
-      const response = await fetch("http://localhost:5000/analyze", {
+      const response = await fetch(`${BASE_URL}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -58,7 +63,7 @@ function Home() {
     }
   };
 
-  const score = result?.review?.ux_score;
+  const score = result?.score;
 
   return (
     <div className="container">
@@ -75,11 +80,10 @@ function Home() {
         />
 
         <button onClick={handleAnalyze} style={{ padding: "10px 18px" }}>
-          Analyze
+          {loading ? "Analyzing..." : "Analyze"}
         </button>
       </div>
 
-      {loading && <p style={{ marginTop: "20px" }}>Analyzing website...</p>}
       {error && <p style={{ color: "red" }}>Error: {error}</p>}
 
       {result && (
@@ -141,7 +145,7 @@ function Status() {
 
   useEffect(() => {
     const fetchStatus = async () => {
-      const response = await fetch("http://localhost:5000/health");
+      const response = await fetch(`${BASE_URL}/status`);
       const data = await response.json();
       setStatus(data);
     };
@@ -165,12 +169,6 @@ function Status() {
           </div>
           <div className="card">
             <strong>LLM:</strong> {status.llm}
-          </div>
-          <div className="card">
-            <strong>Uptime:</strong> {Math.round(status.uptime)} seconds
-          </div>
-          <div className="card">
-            <strong>Memory Usage:</strong> {status.memoryUsageMB} MB
           </div>
         </>
       )}
