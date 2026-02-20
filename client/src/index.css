@@ -1,0 +1,133 @@
+/* ===== GLOBAL STYLES ===== */
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f4f6f8;
+  color: #222;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+h2 {
+  margin-top: 20px;
+}
+
+h3 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* ===== NAVBAR ===== */
+
+nav {
+  background: white;
+  padding: 18px 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+}
+
+nav a {
+  text-decoration: none;
+  margin-right: 30px;
+  font-weight: 600;
+  color: #333;
+  font-size: 16px;
+  transition: 0.2s ease;
+}
+
+nav a:hover {
+  color: #007bff;
+}
+
+/* ===== MAIN CONTAINER ===== */
+
+.container {
+  max-width: 900px;
+  margin: 40px auto;
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* ===== INPUT & BUTTON ===== */
+
+input {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+}
+
+button {
+  background-color: #007bff;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+/* ===== SCORE BOX ===== */
+
+.score-box {
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 20px;
+  margin-top: 10px;
+}
+
+.score-good {
+  background-color: #e6f4ea;
+  color: #2e7d32;
+}
+
+.score-medium {
+  background-color: #fff8e1;
+  color: #f57c00;
+}
+
+.score-low {
+  background-color: #fdecea;
+  color: #c62828;
+}
+
+/* ===== SECTION SPACING ===== */
+
+.section {
+  margin-top: 40px;
+}
+
+/* ===== CARDS ===== */
+
+.card {
+  border: 1px solid #eee;
+  padding: 18px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  background: #fafafa;
+  transition: 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.success-card {
+  border: 1px solid #c8e6c9;
+  background: #f1fff3;
+}
