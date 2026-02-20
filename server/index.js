@@ -2,76 +2,64 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import OpenAI from "openai";
-import { scrapeWebsite } from "./services/scraperService.js";
-import Review from "./models/Review.js";
+import Groq from "groq-sdk";
 
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-/* =========================
-   DATABASE CONNECTION
-========================= */
+/* ============================
+   PORT (Render compatible)
+============================ */
+const PORT = process.env.PORT || 5000;
 
-let dbStatus = "Disconnected";
-
+/* ============================
+   MongoDB Connection
+============================ */
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => {
-    dbStatus = "Connected";
-    console.log("MongoDB Connected ✅");
-  })
-  .catch((error) => {
-    dbStatus = "Error";
-    console.log("MongoDB Connection Failed ❌", error.message);
-  });
+  .then(() => console.log("MongoDB Connected ✅"))
+  .catch((err) => console.error("MongoDB Error:", err));
 
-/* =========================
-   GROQ LLM CONNECTION
-========================= */
-
-let llmStatus = "Disconnected";
-
-const groq = new OpenAI({
+/* ============================
+   Groq Setup
+============================ */
+const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
 });
 
-async function checkLLM() {
-  try {
-    await groq.models.list();
-    llmStatus = "Connected";
-    console.log("Groq LLM Connected ✅");
-  } catch (error) {
-    llmStatus = "Error";
-    console.log("Groq LLM Connection Failed ❌", error.message);
-  }
-}
+console.log("Groq LLM Connected ✅");
 
-checkLLM();
+/* ============================
+   Mongoose Schema
+============================ */
+const reviewSchema = new mongoose.Schema(
+  {
+    url: String,
+    score: Number,
+    review: Object,
+  },
+  { timestamps: true }
+);
 
-/* =========================
-   HEALTH ENDPOINT
-========================= */
+const Review = mongoose.model("Review", reviewSchema);
 
-app.get("/health", (req, res) => {
+/* ============================
+   STATUS ROUTE
+============================ */
+app.get("/status", (req, res) => {
   res.json({
     backend: "Running",
-    uptime: process.uptime(),
-    database: dbStatus,
-    llm: llmStatus,
-    memoryUsageMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+    database: "Connected",
+    llm: "Connected",
   });
 });
 
-/* =========================
-   ANALYZE ENDPOINT
-========================= */
-
+/* ============================
+   ANALYZE ROUTE
+============================ */
 app.post("/analyze", async (req, res) => {
   try {
     const { url } = req.body;
@@ -80,158 +68,96 @@ app.post("/analyze", async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
-    // Validate URL format
-    try {
-      new URL(url);
-    } catch {
-      return res.status(400).json({ error: "Invalid URL format" });
-    }
+    const prompt = `
+You are a professional UX auditor.
 
-    // Step 1: Scrape website
-    const scrapedData = await scrapeWebsite(url);
+Analyze this website URL:
+${url}
 
-    const contentForAI = `
-Title: ${scrapedData.title}
-
-Headings:
-${scrapedData.headings.join("\n")}
-
-Buttons:
-${scrapedData.buttons.join("\n")}
-
-Links:
-${scrapedData.links?.join("\n") || ""}
-
-Paragraphs:
-${scrapedData.paragraphs.join("\n")}
-`;
-
-    // Step 2: Call Groq LLM
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content: `
-You are a senior UX auditor.
-
-Respond ONLY in valid JSON.
-
-IMPORTANT:
-- "category" must be EXACTLY one of:
-  "Clarity",
-  "Layout",
-  "Navigation",
-  "Accessibility",
-  "Trust"
-
-- "severity" must be EXACTLY one of:
-  "Low",
-  "Medium",
-  "High"
-
-Return JSON in this format:
+Return JSON in this exact format:
 
 {
-  "ux_score": number,
+  "score": number (0-100),
   "issues": [
     {
-      "category": "Clarity",
-      "issue": "short title",
-      "severity": "Low",
-      "why": "why it is a problem",
-      "proof": "exact text reference"
+      "category": "Clarity | Layout | Navigation | Accessibility | Trust",
+      "issue": "Short title",
+      "severity": "Low | Medium | High",
+      "why": "Short explanation",
+      "proof": "Exact text or element reference"
     }
   ],
   "top_fixes": [
     {
-      "issue": "issue title",
-      "before": "current situation",
-      "after": "improved version"
+      "issue": "Issue title",
+      "before": "Current state",
+      "after": "Improved version"
     }
   ]
 }
-          `,
+
+Provide 8-12 issues grouped across categories.
+Be specific and realistic.
+`;
+
+    const response = await groq.chat.completions.create({
+      model: "llama3-8b-8192",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a strict UX auditor. Return ONLY valid JSON. No explanations outside JSON.",
         },
         {
           role: "user",
-          content: contentForAI,
+          content: prompt,
         },
       ],
       temperature: 0.3,
     });
 
-    // Step 3: Clean markdown wrapper if exists
-    let rawContent = completion.choices[0].message.content;
+    const content = response.choices[0].message.content;
 
-    rawContent = rawContent
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    let parsedReview;
-
+    let parsed;
     try {
-      parsedReview = JSON.parse(rawContent);
+      parsed = JSON.parse(content);
     } catch (err) {
       return res.status(500).json({
-        error: "LLM returned invalid JSON format.",
-        rawResponse: rawContent,
+        error: "Invalid JSON returned from LLM",
+        raw: content,
       });
     }
 
-    // Step 4: Save to database
-    await Review.create({
+    const newReview = await Review.create({
       url,
-      score: parsedReview.ux_score,
-      review: parsedReview,
+      score: parsed.score,
+      review: {
+        issues: parsed.issues,
+        top_fixes: parsed.top_fixes,
+      },
     });
 
-    // Keep only last 5 reviews
-    const count = await Review.countDocuments();
-    if (count > 5) {
-      const oldest = await Review.findOne().sort({ createdAt: 1 });
-      await Review.findByIdAndDelete(oldest._id);
-    }
-
-    // Step 5: Return structured response
-    res.json({
-      scrapedData,
-      review: parsedReview,
-    });
-
+    res.json(newReview);
   } catch (error) {
-    console.error("ANALYZE ERROR:", error.message);
-    res.status(500).json({
-      error: "Something went wrong while analyzing.",
-    });
+    console.error(error);
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
-/* =========================
-   GET LAST 5 REVIEWS
-========================= */
-
+/* ============================
+   LAST 5 REVIEWS
+============================ */
 app.get("/reviews", async (req, res) => {
-  try {
-    const reviews = await Review.find()
-      .sort({ createdAt: -1 })
-      .limit(5);
+  const reviews = await Review.find()
+    .sort({ createdAt: -1 })
+    .limit(5);
 
-    res.json(reviews);
-  } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch reviews",
-    });
-  }
+  res.json(reviews);
 });
 
-/* =========================
+/* ============================
    START SERVER
-========================= */
-
-const PORT = process.env.PORT || 5000;
-
+============================ */
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
