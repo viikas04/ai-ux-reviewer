@@ -6,20 +6,21 @@ Vikas C Sidenur
 
 ## Summary
 
-I am a software developer with experience in full-stack web development.
+I am a full-stack developer with a strong interest in backend systems and AI-integrated applications.
 
-This project demonstrates my ability to:
+This project demonstrates my ability to design and build a complete production-style application from scratch, including:
 
-- Build backend APIs using Node.js and Express
-- Integrate a Large Language Model (LLM) into a real application
-- Store and retrieve data using MongoDB
-- Build a responsive frontend using React
-- Implement system health monitoring
-- Handle structured JSON responses from AI systems
+- Backend API development using Node.js and Express
+- LLM integration using Groq (LLaMA 3.1)
+- Structured JSON handling from AI responses
+- MongoDB database design and persistence
+- Web scraping using Cheerio
+- Frontend development with React
+- System health monitoring and status reporting
 
-I am interested in building scalable backend systems and AI-integrated applications.
+I focus on writing clean, structured code and building systems that are reliable, maintainable, and well-documented.
 
----
+I am particularly interested in backend architecture, API design, and real-world AI application development.
 
 ## Resume
 
