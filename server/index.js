@@ -33,9 +33,9 @@ console.log("Gemini LLM Connected ✅");
 /* ============================
    Retry wrapper — Gemini's free tier occasionally
    returns a transient 503 "high demand" error.
-   Retry a couple of times before giving up.
+   Retry with increasing delays before giving up.
 ============================ */
-async function generateWithRetry(request, retries = 2, delayMs = 1500) {
+async function generateWithRetry(request, retries = 3, baseDelayMs = 1000) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await ai.models.generateContent(request);
@@ -43,7 +43,7 @@ async function generateWithRetry(request, retries = 2, delayMs = 1500) {
       const isOverloaded = err?.status === 503;
       const isLastAttempt = attempt === retries;
       if (!isOverloaded || isLastAttempt) throw err;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await new Promise((resolve) => setTimeout(resolve, baseDelayMs * (attempt + 1)));
     }
   }
 }
@@ -133,7 +133,7 @@ Be specific and realistic. Score the site 0-100.
 `;
 
     const response = await generateWithRetry({
-      model: "gemini-flash-latest",
+      model: "gemini-2.5-flash-lite",
       contents: prompt,
       config: {
         systemInstruction:
@@ -167,7 +167,12 @@ Be specific and realistic. Score the site 0-100.
     res.json(newReview);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Something went wrong" });
+    const isOverloaded = error?.status === 503;
+    res.status(500).json({
+      error: isOverloaded
+        ? "The AI model is busy right now. Please try again in a few seconds."
+        : "Something went wrong",
+    });
   }
 });
 
