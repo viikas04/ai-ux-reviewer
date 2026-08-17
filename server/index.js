@@ -31,6 +31,24 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 console.log("Gemini LLM Connected ✅");
 
 /* ============================
+   Retry wrapper — Gemini's free tier occasionally
+   returns a transient 503 "high demand" error.
+   Retry a couple of times before giving up.
+============================ */
+async function generateWithRetry(request, retries = 2, delayMs = 1500) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await ai.models.generateContent(request);
+    } catch (err) {
+      const isOverloaded = err?.status === 503;
+      const isLastAttempt = attempt === retries;
+      if (!isOverloaded || isLastAttempt) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
+/* ============================
    Mongoose Schema
 ============================ */
 const reviewSchema = new mongoose.Schema(
@@ -46,8 +64,6 @@ const Review = mongoose.model("Review", reviewSchema);
 
 /* ============================
    JSON schema Gemini must follow
-   (guarantees valid, parseable output — no more
-   "Invalid JSON returned from LLM" failures)
 ============================ */
 const auditSchema = {
   type: "object",
@@ -116,8 +132,8 @@ Navigation, Accessibility, Trust. Severity must be Low, Medium, or High.
 Be specific and realistic. Score the site 0-100.
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+    const response = await generateWithRetry({
+      model: "gemini-flash-latest",
       contents: prompt,
       config: {
         systemInstruction:
