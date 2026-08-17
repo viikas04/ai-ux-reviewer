@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import Groq from "groq-sdk";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
@@ -24,13 +24,11 @@ mongoose
   .catch((err) => console.error("MongoDB Error:", err));
 
 /* ============================
-   Groq Setup
+   Gemini Setup
 ============================ */
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-console.log("Groq LLM Connected ✅");
+console.log("Gemini LLM Connected ✅");
 
 /* ============================
    Mongoose Schema
@@ -45,6 +43,45 @@ const reviewSchema = new mongoose.Schema(
 );
 
 const Review = mongoose.model("Review", reviewSchema);
+
+/* ============================
+   JSON schema Gemini must follow
+   (guarantees valid, parseable output — no more
+   "Invalid JSON returned from LLM" failures)
+============================ */
+const auditSchema = {
+  type: "object",
+  properties: {
+    score: { type: "number" },
+    issues: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          category: { type: "string" },
+          issue: { type: "string" },
+          severity: { type: "string" },
+          why: { type: "string" },
+          proof: { type: "string" },
+        },
+        required: ["category", "issue", "severity", "why", "proof"],
+      },
+    },
+    top_fixes: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          issue: { type: "string" },
+          before: { type: "string" },
+          after: { type: "string" },
+        },
+        required: ["issue", "before", "after"],
+      },
+    },
+  },
+  required: ["score", "issues", "top_fixes"],
+};
 
 /* ============================
    STATUS ROUTE
@@ -74,49 +111,23 @@ You are a professional UX auditor.
 Analyze this website URL:
 ${url}
 
-Return JSON in this exact format:
-
-{
-  "score": number (0-100),
-  "issues": [
-    {
-      "category": "Clarity | Layout | Navigation | Accessibility | Trust",
-      "issue": "Short title",
-      "severity": "Low | Medium | High",
-      "why": "Short explanation",
-      "proof": "Exact text or element reference"
-    }
-  ],
-  "top_fixes": [
-    {
-      "issue": "Issue title",
-      "before": "Current state",
-      "after": "Improved version"
-    }
-  ]
-}
-
-Provide 8-12 issues grouped across categories.
-Be specific and realistic.
+Provide 8-12 issues grouped across these categories: Clarity, Layout,
+Navigation, Accessibility, Trust. Severity must be Low, Medium, or High.
+Be specific and realistic. Score the site 0-100.
 `;
 
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a strict UX auditor. Return ONLY valid JSON. No explanations outside JSON.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      temperature: 0.3,
+    const response = await ai.models.generateContent({
+      model: "gemini-flash-latest",
+      contents: prompt,
+      config: {
+        systemInstruction:
+          "You are a strict UX auditor. Return only the structured audit — no commentary.",
+        responseMimeType: "application/json",
+        responseSchema: auditSchema,
+      },
     });
 
-    const content = response.choices[0].message.content;
+    const content = response.text;
 
     let parsed;
     try {
