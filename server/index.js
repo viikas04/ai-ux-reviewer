@@ -133,7 +133,7 @@ Be specific and realistic. Score the site 0-100.
 `;
 
     const response = await generateWithRetry({
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: {
         systemInstruction:
